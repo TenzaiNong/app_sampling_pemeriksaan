@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="D:\OneDrive Heribertus\OneDrive\Coba test aplikasi\Dashboard_TRAIN\app_sampling\myenv"
+VIRTUAL_ENV="D:\OneDrive Heribertus\OneDrive\Coba test aplikasi\Dashboard_TRAIN\app_sampling\pilih_sampel_pemeriksaan\myenv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
