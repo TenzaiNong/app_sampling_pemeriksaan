@@ -302,37 +302,17 @@ def generate_laporan_docx(df_original, sampled_df, metode_sampling, teknik,
 
     doc.add_paragraph()
 
-    # Detail Sampel (batasi baris)
-    doc.add_heading(f'Detail Sampel (menampilkan max {max_rows} baris)', level=2)
+    # Detail Sampel (ringkasan)
+    doc.add_heading('Detail Sampel', level=2)
     if sampled_df.empty:
         doc.add_paragraph("Tidak ada sampel terpilih.")
     else:
-        # batasi kolom agar tabel Word tidak terlalu lebar
-        max_cols = 10
-        cols = list(sampled_df.columns)[:max_cols]
-        sub = sampled_df[cols].head(max_rows).fillna('')
+        # Beri keterangan agar pembaca membuka lampiran Excel untuk daftar lengkap
+        doc.add_paragraph(
+            "Daftar sampel selengkapnya dilampirkan pada file Excel laporan. "
+            "Untuk melihat data lengkap (semua kolom dan baris), silakan unduh laporan .xlsx."
+        )
 
-        table = doc.add_table(rows=1, cols=len(cols))
-        # header
-        for j, c in enumerate(cols):
-            table.rows[0].cells[j].text = str(c)
-        # rows
-        for _, r in sub.iterrows():
-            cells = table.add_row().cells
-            for j, c in enumerate(cols):
-                val = r[c]
-                # convert to str safely
-                cells[j].text = str(val)
-
-        if len(sampled_df.columns) > max_cols:
-            doc.add_paragraph(f"... (kolom terpotong; dokumen menampilkan hanya {max_cols} kolom pertama).")
-
-        if len(sampled_df) > max_rows:
-            doc.add_paragraph(f"... (baris terpotong; dokumen menampilkan hanya {max_rows} baris pertama).")
-
-    # Footer / catatan
-    doc.add_paragraph()
-    doc.add_paragraph("Catatan: File ini dihasilkan otomatis. Untuk tabel lengkap gunakan format .xlsx.")
 
     # Simpan ke BytesIO
     bio = BytesIO()
@@ -473,7 +453,7 @@ if uploaded_file is not None:
     ])
 
     # Parameter Input UI
-    col_in1, col_in2, col_in3 = st.columns(3)
+    col_in1, col_in2, col_in3, col_in4 = st.columns(4)
     with col_in1:
         confidence = st.selectbox("Confidence Level", [90, 95, 99], index=1)
     with col_in2:
@@ -487,14 +467,31 @@ if uploaded_file is not None:
     if metode_sampling == "Monetary Unit Sampling (MUS)":
         with col_in3:
             dss = st.number_input("Dugaan Salah Saji (DSS)", value=0.0)
-        n_res, error_msg = calc.calculate_mus(total_nilai_buku, confidence,
-                                              sst, dss)
+        with col_in4:
+            expansion = st.selectbox("Expansion Factor", [1, 5, 10, 15, 20, 25, 30, 37], index=1)
+        n_res, error_msg = calc.calculate_mus(total_nilai_buku, confidence, sst, dss, expansion)
 
     elif metode_sampling == "Unstratified Mean Per Unit (MPU)":
         with col_in3:
-            sd = st.number_input("Estimasi Standar Deviasi", value=100000.0)
+            # --- UPDATE: HITUNG OTOMATIS SD DARI DATA ---
+            # Sesuai Juknis: Jika tidak ada data tahun lalu, gunakan data saat ini (piloting)
+            # Kita hitung SD dari kolom nilai rupiah di dataframe
+            current_std_dev = df[value_col].std()
+            
+            st.info(f"💡 SD Populasi saat ini: {current_std_dev:,.2f}")
+            
+            sd = st.number_input(
+                "Estimasi Standar Deviasi (SD)", 
+                value=float(current_std_dev), # Default value langsung dari data
+                min_value=0.0,
+                format="%.2f",
+                help="Default diisi dengan SD Populasi saat ini (sesuai saran Piloting Sample). Bisa diubah jika menggunakan data tahun lalu."
+            )
+
+        # Panggil fungsi perhitungan (Rumusnya sudah benar)
         n_res, error_msg = calc.calculate_mpu_unstratified(
-            len(df), confidence, sst, sd)
+            len(df), confidence, sst, sd
+        )
 
     elif metode_sampling == "Stratified Mean Per Unit (MPU)":
         st.info("ℹ️ Stratifikasi otomatis menggunakan metode Kuantil (Membagi populasi sama rata).")

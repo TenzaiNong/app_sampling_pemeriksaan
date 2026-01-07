@@ -4,19 +4,19 @@ import math
 def get_reliability_factor(confidence_level):
     """
     Mengambil Reliability Factor (RF) untuk MUS (Zero Errors).
-    Referensi: Juknis Hal 48 (Tabel 1.4).
+    Referensi: Juknis Hal 28 (Tabel 1.4).
     """
-    lookup = {90: 2.31, 95: 3.00, 99: 4.61}
+    lookup = {90: 2.40, 95: 3.00, 99: 3.70}
     return lookup.get(confidence_level, 3.00)
 
 
-def get_expansion_factor(confidence_level):
+def get_expansion_factor(expansion_factor):
     """
     Mengambil Expansion Factor (EF) untuk MUS.
-    Referensi: Juknis Hal 48.
+    Referensi: Juknis Hal 36.
     """
-    lookup = {90: 1.5, 95: 1.6, 99: 1.9}
-    return lookup.get(confidence_level, 1.6)
+    lookup = {1: 1.9, 5: 1.6, 10: 1.5, 15: 1.4, 20: 1.3, 25: 1.25, 30: 1.2, 37: 1.15}
+    return lookup.get(expansion_factor, 1.5)
 
 
 def get_ur_coefficient(confidence_level):
@@ -31,14 +31,14 @@ def get_ur_coefficient(confidence_level):
 # --- FUNGSI UTAMA PERHITUNGAN N ---
 
 
-def calculate_mus(total_nilai_buku, confidence_level, sst, dss):
+def calculate_mus(total_nilai_buku, confidence_level, sst, dss, expansion_factor):
     """
     Rumus Monetary Unit Sampling (MUS).
     Juknis Hal 47 (Poin 5b).
     n = (NB * RF) / (SST - (DSS * EF))
     """
     rf = get_reliability_factor(confidence_level)
-    ef = get_expansion_factor(confidence_level)
+    ef = get_expansion_factor(expansion_factor)
 
     denominator = sst - (dss * ef)
     if denominator <= 0:
@@ -57,7 +57,8 @@ def calculate_mpu_unstratified(population_size, confidence_level, sst,
     """
     ur = get_ur_coefficient(confidence_level)
     try:
-        n = ((ur * std_dev_est * population_size) / sst)**2
+        ns = ((ur * std_dev_est * population_size) / sst)**2
+        n = ns/(1 + (ns / population_size))
         return math.ceil(n), None
     except ZeroDivisionError:
         return 0, "SST tidak boleh 0"
@@ -79,22 +80,39 @@ def calculate_difference_ratio(population_size, confidence_level, sst,
 
 def calculate_mpu_stratified(strata_summary, confidence_level, sst):
     """
-    Rumus Stratified MPU (Mean Per Unit).
-    Referensi Logika: Juknis Hal 45 (modifikasi untuk multi-strata).
-    Formula: n_total = ( (Ur * Sum(Ni * SDi)) / SST )^2
+    Rumus Stratified MPU (Mean Per Unit) dengan FPC Presisi.
+    Formula: n = (Sum(Ni * Si))^2 / ( (SST/Ur)^2 + Sum(Ni * Si^2) )
     """
     ur = get_ur_coefficient(confidence_level)
 
-    # Hitung Sum(Ni * SDi)
+    # Inisialisasi KEDUA variabel penampung
     sum_ni_sdi = 0
+    sum_ni_sdi2 = 0  # <--- PERBAIKAN 1: Harus di-init nol dulu
+
     for item in strata_summary:
-        ni = item['count']  # Jumlah populasi di strata i
-        sdi = item['std_dev']  # Standar Deviasi estimasi di strata i
-        sum_ni_sdi += (ni * sdi)
+        ni = item['count']
+        sdi = item['std_dev']
+        
+        # Hitung komponen
+        sum_ni_sdi += (ni * sdi)          # Untuk Pembilang
+        sum_ni_sdi2 += (ni * (sdi ** 2))  # Untuk Penyebut (Koreksi Populasi)
 
     try:
-        # Hitung n total
-        n_total = ((ur * sum_ni_sdi) / sst)**2
+        # Hitung Varians yang Ditoleransi (V)
+        if ur == 0: return 0, "Confidence Level error"
+        v_allowed = (sst / ur) ** 2
+
+        # PERBAIKAN 2: Rumus Pembilang harus dikuadratkan totalnya
+        numerator = sum_ni_sdi ** 2       
+        
+        # Rumus Penyebut
+        denominator = v_allowed + sum_ni_sdi2
+
+        if denominator == 0:
+            return 0, "Denominator 0, cek parameter SST"
+
+        n_total = numerator / denominator
         return math.ceil(n_total), None
+
     except ZeroDivisionError:
         return 0, "SST tidak boleh 0"
