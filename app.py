@@ -563,12 +563,11 @@ if uploaded_file is not None:
             
             # --- ALOKASI SAMPEL (SAMA SEPERTI KODE SEBELUMNYA) ---
             if n_res > 0:
-                st.markdown("#### 📍 Alokasi Sampel Final")
+                st.markdown("#### 📍 Alokasi Sampel")
                 
                 total_weight = sum([s['count'] * s['std_dev'] for s in strata_summary])
-                allocation_dict = {} 
-                final_allocations = []
-                allocation_text = ""
+                allocation_dict_default = {} 
+                allocation_list_default = []
                 
                 for s in strata_summary:
                     weight = s['count'] * s['std_dev']
@@ -582,26 +581,85 @@ if uploaded_file is not None:
                     # Logika Clamping (Sensus jika n > Populasi)
                     if n_teoritis >= s['count']:
                         n_final_strata = s['count']
-                        keterangan = "✅ **Sensus**"
                     else:
                         n_final_strata = n_teoritis
-                        keterangan = ""
                     
-                    final_allocations.append(n_final_strata)
-                    allocation_dict[s['strata']] = int(n_final_strata)
+                    allocation_list_default.append(n_final_strata)
+                    allocation_dict_default[s['strata']] = int(n_final_strata)
+                
+                # Inisialisasi session state untuk alokasi jika belum ada
+                if 'allocation_adjustments' not in st.session_state:
+                    st.session_state['allocation_adjustments'] = allocation_list_default
+                
+                # Tampilkan tabel editor alokasi sampel per strata
+                st.write("🎯 **Sesuaikan alokasi sampel per Strata (opsional)**:")
+                
+                allocation_editor_data = []
+                for idx, s in enumerate(strata_summary):
+                    allocation_editor_data.append({
+                        "Strata": s['strata'],
+                        "Populasi (N)": s['count'],
+                        "Alokasi Otomatis": allocation_dict_default[s['strata']],
+                        "Alokasi Manual": st.session_state['allocation_adjustments'][idx] 
+                            if idx < len(st.session_state['allocation_adjustments']) 
+                            else allocation_dict_default[s['strata']]
+                    })
+                
+                # Data editor untuk customisasi alokasi
+                edited_allocation_raw = st.data_editor(
+                    allocation_editor_data,
+                    column_config={
+                        "Strata": "Range Nilai (Rupiah)",
+                        "Populasi (N)": st.column_config.NumberColumn(
+                            "Populasi",
+                            disabled=True
+                        ),
+                        "Alokasi Otomatis": st.column_config.NumberColumn(
+                            "Alokasi Otomatis",
+                            disabled=True,
+                            help="Berdasarkan rumus proporsi"
+                        ),
+                        "Alokasi Manual": st.column_config.NumberColumn(
+                            "Alokasi Manual",
+                            help="Sesuaikan jumlah sampel untuk strata ini",
+                            required=True,
+                            min_value=0
+                        )
+                    },
+                    disabled=["Strata", "Populasi (N)", "Alokasi Otomatis"],
+                    hide_index=True,
+                    use_container_width=True
+                )
+                
+                # Konversi hasil data_editor ke DataFrame
+                edited_allocation = pd.DataFrame(edited_allocation_raw)
+                
+                # Proses hasil editan
+                allocation_dict = {}
+                final_allocations = []
+                
+                for idx, row in edited_allocation.iterrows():
+                    strata_name = row['Strata']
+                    n_adjusted = int(row['Alokasi Manual'])
+                    pop_strata = row['Populasi (N)']
                     
-                    allocation_text += f"- **{s['strata']}** (Pop: {s['count']}): Ambil **{n_final_strata}** {keterangan}\n"
+                    # Validasi: jangan exceeding populasi
+                    if n_adjusted > pop_strata:
+                        n_adjusted = pop_strata
+                        st.warning(f"⚠️ Alokasi untuk '{strata_name}' disesuaikan menjadi {pop_strata} (tidak boleh melebihi populasi)")
+                    
+                    allocation_dict[strata_name] = n_adjusted
+                    final_allocations.append(n_adjusted)
                 
-                st.markdown(allocation_text)
-                
-                # Update n_res total
+                # Update n_res total dengan alokasi manual
                 n_adjusted_total = sum(final_allocations)
-                st.info(f"💡 Total Sampel: **{n_adjusted_total}** item.")
+                st.info(f"💡 Total Sampel (Sesuai Alokasi Manual): **{n_adjusted_total}** item.")
                 n_res = n_adjusted_total
                 
                 # SIMPAN KE SESSION STATE
                 st.session_state['allocation_dict'] = allocation_dict
                 st.session_state['df_stratified'] = df
+                st.session_state['allocation_adjustments'] = final_allocations
 
         except Exception as e:
             st.error(f"Gagal membagi kuartil otomatis. Data mungkin terlalu sedikit atau seragam. Error: {e}")
