@@ -449,7 +449,7 @@ if uploaded_file is not None:
 
     metode_sampling = st.selectbox("Pilih Metode", [
         "Monetary Unit Sampling (MUS)", "Unstratified Mean Per Unit (MPU)",
-        "Stratified Mean Per Unit (MPU)", "Difference/Ratio Estimation"
+        "Stratified Mean Per Unit (MPU)"
     ])
 
     # Parameter Input UI
@@ -664,12 +664,6 @@ if uploaded_file is not None:
         except Exception as e:
             st.error(f"Gagal membagi kuartil otomatis. Data mungkin terlalu sedikit atau seragam. Error: {e}")
             n_res = 0
-
-    elif metode_sampling == "Difference/Ratio Estimation":
-        with col_in3:
-            var = st.number_input("Estimasi Varians", value=1000000.0)
-        n_res, error_msg = calc.calculate_difference_ratio(
-            len(df), confidence, sst, var)
 
     # Tampilkan Hasil N
     if error_msg:

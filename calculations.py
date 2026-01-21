@@ -64,18 +64,18 @@ def calculate_mpu_unstratified(population_size, confidence_level, sst,
         return 0, "SST tidak boleh 0"
 
 
-def calculate_difference_ratio(population_size, confidence_level, sst,
-                               est_variance):
-    """
-    Rumus estimasi untuk Difference/Ratio Estimation.
-    (Penyederhanaan berbasis varians).
-    """
-    ur = get_ur_coefficient(confidence_level)
-    try:
-        n = ((ur * population_size * math.sqrt(est_variance)) / sst)**2
-        return math.ceil(n), None
-    except ZeroDivisionError:
-        return 0, "SST tidak boleh 0"
+#def calculate_difference_ratio(population_size, confidence_level, sst,
+#                               est_variance):
+#    """
+#    Rumus estimasi untuk Difference/Ratio Estimation.
+#    (Penyederhanaan berbasis varians).
+#    """
+#    ur = get_ur_coefficient(confidence_level)
+#    try:
+#        n = ((ur * population_size * math.sqrt(est_variance)) / sst)**2
+#        return math.ceil(n), None
+#    except ZeroDivisionError:
+#        return 0, "SST tidak boleh 0"
 
 
 def calculate_mpu_stratified(strata_summary, confidence_level, sst):
