@@ -353,6 +353,44 @@ st.set_page_config(page_title="Dashboard Sampling Audit", layout="wide")
 st.title("🕵️ Dashboard Uji Petik Pemeriksaan Keuangan")
 st.markdown("---")
 
+# === PANDUAN METODE UJI PETIK ===
+with st.expander("📚 Panduan Metode Uji Petik", expanded=False):
+    st.markdown("""
+    ### Panduan Penentuan Metode Uji Petik
+    
+    Dalam menentukan metode uji petik, pemeriksa pada umumnya mempertimbangkan dua aspek utama, yaitu **nilai transaksi** dan **jumlah transaksi**. 
+    
+    - **Nilai transaksi** merupakan nilai uang yang diakui dan dicatat dalam laporan keuangan sebagai akibat dari suatu transaksi
+    - **Jumlah transaksi** adalah banyaknya kejadian transaksi yang dicatat dalam suatu periode tertentu
+    
+    Berdasarkan kedua pertimbangan tersebut, pemeriksa dapat menentukan metode uji petik statistik yang sesuai dengan karakteristik populasi yang diperiksa:
+    
+    ---
+    
+    #### 1️⃣ **Monetary Unit Sampling (MUS)**
+    
+    Metode ini dapat digunakan apabila pemeriksa melakukan uji petik yang **berfokus pada nilai transaksi**. 
+    
+    Dalam metode ini, transaksi dengan nilai yang lebih besar memiliki peluang lebih tinggi untuk terpilih sebagai sampel.  
+    
+    ---
+    
+    #### 2️⃣ **Unstratified Mean Per Unit (MPU)**
+    
+    Metode ini dapat digunakan apabila pemeriksa melakukan uji petik yang **berfokus pada jumlah transaksi**, tanpa mempertimbangkan perbedaan nilai transaksi. 
+    
+    Metode ini sesuai diterapkan pada populasi dengan karakteristik nilai transaksi yang **relatif homogen** dan tidak memiliki rentang nilai yang terlalu besar.
+    
+    ---
+    
+    #### 3️⃣ **Stratified Mean Per Unit (MPU)**
+    
+    Metode ini dapat digunakan apabila pemeriksa **mempertimbangkan jumlah transaksi sekaligus nilai transaksi** dalam penentuan sampel. 
+    
+    Metode ini sesuai untuk populasi dengan karakteristik nilai transaksi yang **heterogen** serta memiliki **rentang nilai yang besar**, sehingga diperlukan pengelompokan (stratifikasi) untuk meningkatkan efektivitas dan representativitas sampel.
+    
+    """)
+
 # 1. UPLOAD
 st.sidebar.header("1. Upload Data")
 uploaded_file = st.sidebar.file_uploader("Upload Tabel Data (Excel/CSV/Parquet)",
@@ -498,7 +536,7 @@ if uploaded_file is not None:
         
         # 1. KONSEP PILIHAN KUARTIL
         # Default audit biasanya 4 (Kuartil), tapi kita beri fleksibilitas
-        n_bins = st.slider("Bagi populasi menjadi berapa bagian? (Default: 4 - Kuartil)", min_value=3, max_value=10, value=4)
+        n_bins = st.slider("Bagi populasi menjadi berapa bagian? (Default: 4 - Strata)", min_value=3, max_value=10, value=4)
         
         # 2. PROSES PEMBAGIAN STRATA OTOMATIS (BINNING)
         try:
@@ -524,7 +562,7 @@ if uploaded_file is not None:
             strata_stats = df.groupby('Strata', observed=True)[value_col].agg(['count', 'std', 'mean']).reset_index()
             
             # --- TAMPILAN TABEL EDITOR ---
-            st.write("📊 Distribusi Populasi per Kuartil:")
+            st.write("📊 Distribusi Populasi per Strata:")
             
             # Isi NaN pada std dengan 0 (jika populasi strata cuma 1, std tidak bisa dihitung)
             strata_stats['std'] = strata_stats['std'].fillna(0)
