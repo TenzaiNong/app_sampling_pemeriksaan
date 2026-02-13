@@ -57,7 +57,7 @@ def detect_anomali_pendapatan(df, bulan_cols):
                     variasi_min = min(variasi_min, perubahan)
                     
                     # Catat persentase variasi terendah yang <= 20%
-                    if perubahan <= 0.20 and variasi_rendah_pct is None:
+                    if perubahan <= 0.10 and variasi_rendah_pct is None:
                         variasi_rendah_pct = perubahan
             
             if variasi_rendah_pct is not None:
