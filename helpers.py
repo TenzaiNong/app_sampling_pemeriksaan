@@ -400,11 +400,18 @@ def generate_laporan_pendapatan_xlsx(df_original, anomali_list, bulan_cols):
     
     with pd.ExcelWriter(buff, engine='openpyxl') as writer:
         # === SHEET 1: RINGKASAN ===
+        # Hitung total realisasi untuk WP anomali
+        anomalous_total = sum([item.get('total_realisasi', 0) for item in anomali_list]) if anomali_list else 0
+        total_pendapatan = statistik.get('total_pendapatan', 0)
+        anomalous_pct = (anomalous_total / total_pendapatan * 100) if total_pendapatan > 0 else 0
+
         ringkasan_data = {
             'Keterangan': [
                 'Total WP dalam Populasi',
                 'WP dengan Anomali Terdeteksi',
                 'Persentase WP Anomali (%)',
+                'Total Realisasi Anomali (Rp)',
+                'Persentase Realisasi Anomali (%)',
                 'Total Pendapatan (Rp)',
                 'Rata-rata Pendapatan (Rp)',
                 'Median Pendapatan (Rp)',
@@ -417,6 +424,8 @@ def generate_laporan_pendapatan_xlsx(df_original, anomali_list, bulan_cols):
                 statistik['total_wp'],
                 len(anomali_list),
                 f"{(len(anomali_list) / statistik['total_wp'] * 100):.2f}%" if statistik['total_wp'] > 0 else "0%",
+                f"Rp {anomalous_total:,.2f}",
+                f"{anomalous_pct:.2f}%",
                 f"Rp {statistik['total_pendapatan']:,.2f}",
                 f"Rp {statistik['rata_rata']:,.2f}",
                 f"Rp {statistik['median']:,.2f}",
@@ -444,6 +453,9 @@ def generate_laporan_pendapatan_xlsx(df_original, anomali_list, bulan_cols):
                 'max': 'Max (Rp)',
                 'std_dev': 'Std Dev (Rp)'
             })
+            # Jika analyzer mengembalikan total_realisasi, tambahkan kolom untuk ditampilkan
+            if 'total_realisasi' in df_anomali.columns:
+                df_anomali = df_anomali.rename(columns={'total_realisasi': 'Total Realisasi (Rp)'})
             df_anomali.to_excel(writer, sheet_name='Daftar Anomali', index=False)
         
         # === FORMATTING ===
@@ -508,6 +520,12 @@ def generate_laporan_pendapatan_docx(df_original, anomali_list, bulan_cols):
     doc.add_paragraph(f"Total WP dalam Populasi: {statistik['total_wp']} WP")
     doc.add_paragraph(f"WP dengan Anomali Terdeteksi: {len(anomali_list)} WP")
     doc.add_paragraph(f"Persentase WP Anomali: {(len(anomali_list) / statistik['total_wp'] * 100):.2f}%")
+    # Hitung total realisasi anomali dan persentasenya
+    anomalous_total = sum([item.get('total_realisasi', 0) for item in anomali_list]) if anomali_list else 0
+    total_pendapatan = statistik.get('total_pendapatan', 0)
+    anomalous_pct = (anomalous_total / total_pendapatan * 100) if total_pendapatan > 0 else 0
+    doc.add_paragraph(f"Total Realisasi Anomali: Rp {anomalous_total:,.2f}")
+    doc.add_paragraph(f"Persentase Realisasi Anomali: {anomalous_pct:.2f}%")
     
     doc.add_heading('Statistik Pendapatan', level=2)
     doc.add_paragraph(f"Total Pendapatan: Rp {statistik['total_pendapatan']:,.2f}")
@@ -521,22 +539,24 @@ def generate_laporan_pendapatan_docx(df_original, anomali_list, bulan_cols):
     doc.add_heading('Daftar WP dengan Anomali', level=2)
     
     if anomali_list:
-        # Buat tabel
-        tbl = doc.add_table(rows=1, cols=5)
+        # Buat tabel (tambah kolom Total Realisasi)
+        tbl = doc.add_table(rows=1, cols=6)
         hdr_cells = tbl.rows[0].cells
         hdr_cells[0].text = 'No'
         hdr_cells[1].text = 'Nama WP'
         hdr_cells[2].text = 'NPWPD'
         hdr_cells[3].text = 'Jenis Anomali'
         hdr_cells[4].text = 'Rata-rata Pendapatan'
-        
+        hdr_cells[5].text = 'Total Realisasi'
+
         for item in anomali_list[:100]:  # Limit 100 baris untuk dokumen
             row_cells = tbl.add_row().cells
-            row_cells[0].text = str(item['nomor'])
-            row_cells[1].text = str(item['nama_wp'])
-            row_cells[2].text = str(item['npwpd'])
-            row_cells[3].text = str(item['jenis_anomali'])
-            row_cells[4].text = f"Rp {item['rata_rata']:,.2f}"
+            row_cells[0].text = str(item.get('nomor', ''))
+            row_cells[1].text = str(item.get('nama_wp', ''))
+            row_cells[2].text = str(item.get('npwpd', ''))
+            row_cells[3].text = str(item.get('jenis_anomali', ''))
+            row_cells[4].text = f"Rp {item.get('rata_rata', 0):,.2f}"
+            row_cells[5].text = f"Rp {item.get('total_realisasi', 0):,.2f}"
         
         if len(anomali_list) > 100:
             doc.add_paragraph(f"... dan {len(anomali_list) - 100} WP lainnya (lihat laporan Excel untuk lengkapnya)")

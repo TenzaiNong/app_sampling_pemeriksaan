@@ -102,7 +102,7 @@ if jenis_sampling == "Pendapatan":
                     stat_pend = pend_analyzer.hitung_statistik_pendapatan(df_pend, available_bulan)
                     
                     # Metrics
-                    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                    col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns(5)
                     with col_m1:
                         st.metric("Total WP", stat_pend['total_wp'])
                     with col_m2:
@@ -112,18 +112,28 @@ if jenis_sampling == "Pendapatan":
                         st.metric("% Anomali", f"{pct_anomali:.2f}%")
                     with col_m4:
                         st.metric("Total Pendapatan", f"Rp {stat_pend['total_pendapatan']:,.0f}")
+                    with col_m5:
+                        anomalous_total = sum([item.get('total_realisasi', 0) for item in anomali_results]) if anomali_results else 0
+                        anomalous_pct = (anomalous_total / stat_pend['total_pendapatan'] * 100) if stat_pend['total_pendapatan'] > 0 else 0
+                        st.metric("Total Realisasi Anomali", f"Rp {anomalous_total:,.0f}", delta=f"{anomalous_pct:.2f}%")
                     
                     # Daftar Anomali
                     st.subheader("📋 Daftar WP dengan Anomali")
                     if anomali_results:
-                        df_anomali_display = pd.DataFrame(anomali_results)[['nomor', 'nama_wp', 'npwpd', 'jenis_anomali', 'rata_rata']]
+                        df_anomali_display = pd.DataFrame(anomali_results)[['nomor', 'nama_wp', 'npwpd', 'jenis_anomali', 'rata_rata', 'total_realisasi']]
                         df_anomali_display = df_anomali_display.rename(columns={
                             'nomor': 'No',
                             'nama_wp': 'Nama WP',
                             'npwpd': 'NPWPD',
                             'jenis_anomali': 'Jenis Anomali',
-                            'rata_rata': 'Rata-rata Pendapatan'
+                            'rata_rata': 'Rata-rata Pendapatan',
+                            'total_realisasi': 'Total Realisasi'
                         })
+                        # Format angka
+                        if 'Total Realisasi' in df_anomali_display.columns:
+                            df_anomali_display['Total Realisasi'] = df_anomali_display['Total Realisasi'].apply(lambda x: f"Rp {x:,.0f}" if pd.notna(x) else "Rp 0")
+                        if 'Rata-rata Pendapatan' in df_anomali_display.columns:
+                            df_anomali_display['Rata-rata Pendapatan'] = df_anomali_display['Rata-rata Pendapatan'].apply(lambda x: f"Rp {x:,.2f}" if pd.notna(x) else "-")
                         st.dataframe(df_anomali_display, use_container_width=True)
                         
                         # Download Laporan
