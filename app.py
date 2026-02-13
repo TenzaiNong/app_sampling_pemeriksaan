@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from io import BytesIO
 import csv
+import re
 import chardet  # Perlu di-install: pip install chardet
 
 # --- IMPORT MODUL SENDIRI ---
@@ -63,43 +64,83 @@ def detect_csv_delimiter(uploaded_file, sample_size=5000):
         
         uploaded_file.seek(0)
         return ',', encoding  # Default ke comma
-    
+
+
 def convert_rupiah_to_numeric(df):
     """
-    Konversi kolom dengan format Rupiah (1.234.567,50) ke numerik.
-    Format: Pemisah ribuan '.' dan desimal ','.
+    Konversi kolom Rupiah ke numerik dengan perlindungan ketat (Cek 5 Baris).
+    Hanya konversi jika TIDAK ADA huruf sama sekali pada sampel data.
     """
+    import re # Wajib import di sini
+    
+    print("--- Memulai Cek Konversi Data ---")
+
     for col in df.columns:
         try:
-            # Cek jika kolom berisi tanda Rupiah
-            if df[col].dtype == 'object':  # Kolom string
-                # Ambil sample untuk deteksi
-                sample = df[col].astype(str).iloc[0]
+            # 1. Hanya proses kolom tipe Object (String)
+            if df[col].dtype != 'object':
+                continue
+
+            # 2. Ambil 5 sampel data teratas yang tidak kosong (NaN)
+            # Mengambil 5 baris lebih aman daripada cuma 1 baris
+            valid_samples = df[col].dropna().head(5).astype(str).tolist()
+            
+            if not valid_samples:
+                continue
+
+            # 3. DETEKSI TEKS (HURUF)
+            # Jika ada SATU SAJA sampel yang mengandung huruf a-z, skip kolom ini!
+            is_text_column = False
+            for s in valid_samples:
+                # Bersihkan simbol umum, sisakan huruf dan angka
+                clean_check = s.lower().replace('rp', '').replace('.', '').replace(',', '').replace('-', '').strip()
                 
-                # Deteksi jika format Rupiah (ada . dan ,)
-                if '.' in sample and ',' in sample:
-                    # Contoh: "1.234.567,50" -> "1234567.50"
+                # Cek regex huruf a-z
+                if re.search('[a-z]', clean_check):
+                    is_text_column = True
+                    break # Stop, ini pasti kolom Nama/Keterangan
+            
+            if is_text_column:
+                # print(f"ℹ️ Skip kolom '{col}': Terdeteksi sebagai Teks/Nama")
+                continue
+
+            # 4. Jika lolos cek huruf, baru coba konversi angka
+            # Ambil sampel pertama untuk penentuan pola (Titik/Koma)
+            sample = valid_samples[0]
+            
+            # Pola 1: Format Rupiah Indonesia (Ribuan Titik, Desimal Koma) -> 1.250.000,00
+            if '.' in sample and ',' in sample:
+                last_dot = sample.rfind('.')
+                last_comma = sample.rfind(',')
+                
+                if last_dot < last_comma:
                     df[col] = (df[col]
                                .astype(str)
-                               .str.replace('.', '', regex=False)  # Hapus pemisah ribuan
-                               .str.replace(',', '.', regex=False)  # Ubah desimal , menjadi .
+                               .str.replace('Rp', '', regex=False)
+                               .str.replace(' ', '', regex=False)
+                               .str.replace('.', '', regex=False) # Hapus ribuan
+                               .str.replace(',', '.', regex=False) # Koma jadi titik
                                .apply(pd.to_numeric, errors='coerce'))
-                    
-                    print(f"✅ Konversi kolom '{col}' dari format Rupiah ke numerik")
-                
-                elif ',' in sample and '.' not in sample:
-                    # Alternatif: hanya ada , sebagai desimal
+                    print(f"✅ Konversi '{col}': Format Rupiah (Indo)")
+
+            # Pola 2: Format Desimal Koma Saja (1250000,00)
+            elif ',' in sample and '.' not in sample:
+                # Pastikan yang tersisa hanya angka
+                clean_sample = sample.replace(',', '').strip()
+                if clean_sample.isdigit():
                     df[col] = (df[col]
                                .astype(str)
                                .str.replace(',', '.', regex=False)
                                .apply(pd.to_numeric, errors='coerce'))
-                    
-                    print(f"✅ Konversi kolom '{col}' (desimal koma) ke numerik")
-                    
+                    print(f"✅ Konversi '{col}': Desimal Koma")
+
         except Exception as e:
-            pass  # Skip kolom yang tidak bisa dikonversi
+            # Jika error, biarkan kolom apa adanya
+            pass
     
+    print("--- Selesai Cek Konversi ---")
     return df
+    
 
 #KODE untuk buat Laporan dalam bentuk excel
 def generate_laporan_xlsx(df_original, sampled_df, metode_sampling, teknik, 
@@ -436,37 +477,15 @@ if uploaded_file is not None:
     # st.write("Tipe Data Kolom:")
     #st.write(df.dtypes)
 
-    # Konversi kolom dengan format Rupiah (1.234.567,50) ke numerik.
-    # Format: Pemisah ribuan '.' dan desimal ','.
-    for col in df.columns:
-        try:
-            # Cek jika kolom berisi tanda Rupiah
-            if df[col].dtype == 'object':  # Kolom string
-                # Ambil sample untuk deteksi
-                sample = df[col].astype(str).iloc[0]
-                
-                # Deteksi jika format Rupiah (ada . dan ,)
-                if '.' in sample and ',' in sample:
-                    # Contoh: "1.234.567,50" -> "1234567.50"
-                    df[col] = (df[col]
-                               .astype(str)
-                               .str.replace('.', '', regex=False)  # Hapus pemisah ribuan
-                               .str.replace(',', '.', regex=False)  # Ubah desimal , menjadi .
-                               .apply(pd.to_numeric, errors='coerce'))
-                    
-                    print(f"✅ Konversi kolom '{col}' dari format Rupiah ke numerik")
-                
-                elif ',' in sample and '.' not in sample:
-                    # Alternatif: hanya ada , sebagai desimal
-                    df[col] = (df[col]
-                               .astype(str)
-                               .str.replace(',', '.', regex=False)
-                               .apply(pd.to_numeric, errors='coerce'))
-                    
-                    print(f"✅ Konversi kolom '{col}' (desimal koma) ke numerik")
-                    
-        except Exception as e:
-            pass  # Skip kolom yang tidak bisa dikonversi
+    # Konversi kolom dengan format Rupiah ke numerik (pakai fungsi yang lebih ketat)
+    # --- GANTI: gunakan fungsi `convert_rupiah_to_numeric` yang memeriksa beberapa sampel
+    # agar kolom teks seperti nama, keterangan, pegawai tidak keliru dikonversi menjadi NaN.
+    try:
+        df = convert_rupiah_to_numeric(df)
+    except Exception:
+        # Jika gagal, biarkan dataframe apa adanya dan log untuk debugging
+        print("⚠️ Gagal menjalankan convert_rupiah_to_numeric; melewatkan konversi.")
+        pass
     
     # 2. PEMETAAN
     col1, col2 = st.columns(2)
@@ -775,12 +794,24 @@ if uploaded_file is not None:
         
         st.success(f"Terpilih {len(current_sampled_df)} sampel.")
 
-        # Tampilkan rincian per strata (opsional)
-        if 'Strata' in current_sampled_df.columns:
-            st.write("Rincian Sampel per Strata:")
-            st.write(current_sampled_df['Strata'].value_counts())
+        # Hitung total nilai sampel untuk kolom yang dipilih (jika ada)
+        display_df = current_sampled_df.copy()
+        try:
+            if value_col in display_df.columns:
+                total_sampled_value = display_df[value_col].sum()
+                # Tampilkan metric ringkasan
+                st.metric("Total Nilai Sampel", f"Rp {total_sampled_value:,.2f}")
+            else:
+                st.info("Kolom Nilai Rupiah tidak ditemukan dalam data sampel; total tidak ditampilkan.")
+        except Exception as e:
+            st.warning(f"Gagal menghitung total nilai sampel: {e}")
 
-        st.dataframe(current_sampled_df)
+        # Tampilkan rincian per strata (opsional)
+        if 'Strata' in display_df.columns:
+            st.write("Rincian Sampel per Strata:")
+            st.write(display_df['Strata'].value_counts())
+
+        st.dataframe(display_df)
         
         # === BUTTONS DOWNLOAD ===
         col_btn1, col_btn2, col_btn3 = st.columns(3)

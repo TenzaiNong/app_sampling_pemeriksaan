@@ -155,6 +155,17 @@ def select_stratified_distributed(df, allocation_dict, technique_name,
 
     # Gabungkan kembali semua hasil
     if sampled_parts:
-        return pd.concat(sampled_parts)
+        result = pd.concat(sampled_parts).reset_index(drop=True)
+
+        # Pastikan kolom Strata ditampilkan dengan jelas (konversi ke string)
+        if 'Strata' in result.columns:
+            # Convert categories or intervals to readable strings
+            try:
+                result['Strata'] = result['Strata'].astype(str)
+            except Exception:
+                # fallback: cast element-wise
+                result['Strata'] = result['Strata'].apply(lambda x: str(x) if pd.notna(x) else '')
+
+        return result
     else:
         return pd.DataFrame()
