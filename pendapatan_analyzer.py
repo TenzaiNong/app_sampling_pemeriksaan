@@ -13,7 +13,7 @@ def detect_anomali_pendapatan(df, bulan_cols):
     
     Kriteria:
     1. Pelaporan Identik: Nilai sama setiap bulan
-    2. Variasi Rendah: Perubahan antar bulan <= 20%
+    2. Variasi Rendah: Perubahan antar bulan <= 10%
     
     Args:
         df: DataFrame dengan data WP
