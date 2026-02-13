@@ -1,6 +1,6 @@
 """
 Modul untuk analisis anomali data pendapatan WP.
-Mendeteksi pelaporan identik dan variasi rendah (<=20%) antar bulan.
+Mendeteksi pelaporan identik dan variasi rendah (<=5%) antar bulan.
 """
 
 import pandas as pd
@@ -46,7 +46,7 @@ def detect_anomali_pendapatan(df, bulan_cols):
             adalah_anomali = True
             jenis_anomali.append("Pelaporan Identik (0.00%)")
         
-        # Kriteria 2: Variasi Rendah (<= 20%)
+        # Kriteria 2: Variasi Rendah (<= 5%)
         if len(vals) >= 2 and not (len(set(vals)) == 1):  # Jika tidak semua identik
             variasi_rendah_pct = None
             
@@ -56,8 +56,8 @@ def detect_anomali_pendapatan(df, bulan_cols):
                     perubahan = abs(vals[i+1] - vals[i]) / vals[i]
                     variasi_min = min(variasi_min, perubahan)
                     
-                    # Catat persentase variasi terendah yang <= 20%
-                    if perubahan <= 0.10 and variasi_rendah_pct is None:
+                    # Catat persentase variasi terendah yang <= 5%
+                    if perubahan <= 0.05 and variasi_rendah_pct is None:
                         variasi_rendah_pct = perubahan
             
             if variasi_rendah_pct is not None:
